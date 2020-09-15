@@ -1,0 +1,9 @@
+/_pycache_/
+*.pyc
+/.idea/
+/cert/
+/dist/
+*.spec
+*.icon
+*.txt
+*.log
