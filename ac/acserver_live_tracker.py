@@ -2,7 +2,6 @@
 import os
 import autobahn
 import sys
-import requests
 import json
 from broadcast import broadcast
 import threading
@@ -43,7 +42,8 @@ def callback(event):
     elif type(event) == ProtocolError:
         print("ProtocolError")
     else:
-        print("<unknown event>", type(event))
+        # print("<unknown event>", type(event))
+        pass
     # print("playersDict %s %s" % (playersDict.keys(), time.time()))
 
 
@@ -53,10 +53,6 @@ def handle_NewConnection(event):
     carId = int(event.carId)
     if carId not in playersDict:
         player = Player(carId)
-        t = get_player_dhq_info(event.driverGuid).split("|")
-        player.cname = t[0]
-        player.dhq_plyname = t[1]
-        player.uid = t[2]
     else:
         player = playersDict[carId]
     player.carId = carId
@@ -93,11 +89,18 @@ def handle_lap_completed(event):
         if 0 < player.mLastLapTime < player.mBestLapTime:
             player.mBestLapTime = player.mLastLapTime
         player.mCurSector1 = player.mCurSector2 = player.mCurSector3 = NOTIME
-        lb_str = ""
+        j = 1
         for i in event.leaderboard:
-            lb_str = lb_str + "-" + str(i)
-
-        # player.leaderboard = lb_str
+            lb_str = str(i).replace("<class 'acplugins4python.ac_server_protocol.LeaderboardEntry'>", "")
+            lb_str = lb_str.replace("(", "").replace(")", "")  # carId=12, lapTime=75182, laps=13, completed=0,
+            temp = lb_str.split(",")
+            tempCarId = int(temp[0][6:])
+            # print("tempCarId:" + str(tempCarId))
+            if tempCarId in playersDict:
+                playersDict[tempCarId].mTotalLaps = temp[2][6:]
+                print(lb_str + " place:" + str(j) + " laps:" + temp[2][6:])
+                playersDict[tempCarId].mPlace = j
+            j += 1
         playersDict[carId] = player
     else:
         print("CarId:%s is not ready yet,try to get carInfo" % carId)
@@ -137,7 +140,7 @@ def handle_car_update(event):
 class Player:
     def __init__(self, carId, plyname="", dhq_plyname="", uid=0, cname="", guid=0, car="", s1=NOTIME, s2=NOTIME,
                  s3=NOTIME, lastLapTime=NOTIME,
-                 bestLapTime=9999999, laps=0, mPos_X=0, mPos_Y=0, mLocalVel_X=0, mLocalVel_Y=0, normalizedSplinePos = 0):
+                 bestLapTime=9999999, laps=0, mPos_X=0, mPos_Y=0, mLocalVel_X=0, mLocalVel_Y=0, normalizedSplinePos=0, leaderboard="", place = 99):
         self.carId = carId
         self.mDriverName = plyname  # 玩家在游戏里的名字
         self.dhq_plyname = dhq_plyname  # 玩家在dhq数据库里的名字
@@ -156,6 +159,8 @@ class Player:
         self.mLocalVel_X = mLocalVel_X
         self.mLocalVel_Y = mLocalVel_Y
         self.normalizedSplinePos = normalizedSplinePos
+        self.leaderboard = leaderboard
+        self.place = place
 
 
 def get_lastest_file(path):
@@ -258,7 +263,7 @@ def main():
 
 
 if __name__ == "__main__":
-    print("SRFC AC SERVER UDP TRACKER 0.5\n\n")
+    print("SRFC AC SERVER UDP TRACKER 0.62\n\n")
     s = ""
     iniObj = IniHandle()
     ini = iniObj.read()
@@ -266,7 +271,7 @@ if __name__ == "__main__":
     ACPath = ini['AC_path']
     logPath = ACPath + "logs/session/"
     ac_cfg = get_ac_cfg(ACPath + "cfg/server_cfg.ini")
-    print("Server:" + ac_cfg['NAME'])
+    print("Server:" + ac_cfg['NAME'] + "\n")
     maxPlayer = int(ac_cfg['MAX_CLIENTS'])
     print("Max player:" + str(maxPlayer))
 
