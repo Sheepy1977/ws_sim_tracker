@@ -1,0 +1,1 @@
+pyinstaller -F acserver_live_tracker.py --version-file file_version_info.txt -i icon.ico -n ACSERVER_UDP_TRACKER_0.60

@@ -1,0 +1,1 @@
+pyinstaller -F rf2_server_tracker_ws.py --version-file file_version_info.txt -i icon.ico -n rF2_tracker_0.5
