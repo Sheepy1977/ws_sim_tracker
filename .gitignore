@@ -1,4 +1,4 @@
-/_pycache_/
+/__pycache__/
 
 *.pyc
 
@@ -7,6 +7,7 @@
 /cert/
 
 /dist/
+/build/
 
 *.spec
 
