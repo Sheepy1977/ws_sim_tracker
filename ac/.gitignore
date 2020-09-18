@@ -17,4 +17,5 @@
 
 *.log
 
+*.bat
 /venv/
