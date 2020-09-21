@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 import os
-import autobahn
 import logging
-import time
 import requests
 import sys
 import json
@@ -20,7 +18,7 @@ headers = {'user-agent': 'SRFC AC TRACKER/0.8'}
 class Player:
     def __init__(self, carId, plyname="", dhq_plyname="", uid=0, cname="", guid=0, car="", s1=NOTIME, s2=NOTIME,
                  s3=NOTIME, lastLapTime=NOTIME, isConnected=False,
-                 bestLapTime=9999999, mTotalLaps=0, mPos_X=0, mPos_Y=0, mLocalVel_X=0, mLocalVel_Y=0, normalizedSplinePos=0, leaderboard="", mPlace=99):
+                 bestLapTime=9999999, mTotalLaps=0, mPos_X=0, mPos_Y=0, mLocalVel_X=0, mLocalVel_Y=0, normalizedSplinePos=0, leaderboard="", mPlace=99, cuts=0):
         self.carId = carId
         self.mDriverName = plyname  # 玩家在游戏里的名字
         self.dhq_plyname = dhq_plyname  # 玩家在dhq数据库里的名字
@@ -42,6 +40,7 @@ class Player:
         self.leaderboard = leaderboard
         self.mPlace = mPlace
         self.isConnected = isConnected
+        self.cuts = cuts
 
 
 def callback(event):
@@ -71,7 +70,7 @@ def callback(event):
         print("EndSession")
     elif type(event) == ClientLoaded:
         print("ClientLoaded")
-        gInfo = str(event.carId) + "加载完毕"
+        gInfo = str(event.carId) + " loaded"
     elif type(event) == ProtocolError:
         print("ProtocolError")
     else:
@@ -82,7 +81,7 @@ def callback(event):
 
 def handle_new_session():
     global gInfo
-    gInfo = "新SESSION"
+    gInfo = "New SESSION"
     get_carInfo()  # 新session确保carId列表正确
 
 
@@ -90,7 +89,7 @@ def handle_NewConnection(event):
     global gInfo, playersDict
     # print_event(event)
     carId = int(event.carId)
-    gInfo = "新连接，ID:" + str(carId)
+    gInfo = "New connection，ID:" + str(carId)
     if carId not in playersDict:
         player = Player(carId)
     else:
@@ -117,7 +116,7 @@ def handle_car_info(event):
 def handle_ConnectionClosed(event):
     global gInfo, playersDict
     carId = int(event.carId)
-    gInfo = "ID:" + str(carId) + "断开连接"
+    gInfo = "ID:" + str(carId) + " disconnected"
     if carId in playersDict:
         # playersDict[carId].isConnected = False
         del playersDict[carId]
@@ -127,11 +126,12 @@ def handle_ConnectionClosed(event):
 def handle_lap_completed(event):
     global s, gInfo, playersDict
     carId = int(event.carId)
-    gInfo = "ID:" + str(carId) + "完成计时圈"
+    gInfo = "ID:" + str(carId) + " finished a lap"
     if carId in playersDict:
         player = playersDict[carId]
         player.mLastLapTime = event.lapTime / 1000
-        if 0 < player.mLastLapTime < player.mBestLapTime:
+        player.cuts = event.cuts
+        if 0 < player.mLastLapTime < player.mBestLapTime and not player.cuts:
             player.mBestLapTime = player.mLastLapTime
         j = 1
         for i in event.leaderboard:
@@ -158,7 +158,7 @@ def handle_lap_completed(event):
         else:
             print("CarId:%s laptime have %i cut(s)" % (carId, event.cuts))
     else:
-        gInfo = "ID:" + str(carId) + "信息未知，重新获取"
+        gInfo = "ID:" + str(carId) + " unknow,requiring"
         print("CarId:%s is not ready yet,try to get carInfo" % carId)
         s.getCarInfo(carId)
         s.processServerPackets(1)
@@ -173,9 +173,9 @@ def handle_car_update(event):
         playersDict[carId].mLocalVel_X = float(event.velocity[2])
         playersDict[carId].mLocalVel_Y = float(event.velocity[0])
         playersDict[carId].normalizedSplinePos = event.normalizedSplinePos
-        gInfo = "收到ID:" + str(carId) + "的更新信息(" + str(int(playersDict[carId].mPos_X)) + "," + str(int(playersDict[carId].mPos_Y)) + ")" + time.strftime("%H:%M:%S", time.localtime())
+        gInfo = "ID:" + str(carId) + " update:(" + str(int(playersDict[carId].mPos_X)) + "," + str(int(playersDict[carId].mPos_Y)) + ")" + time.strftime("%H:%M:%S", time.localtime())
     else:
-        gInfo = "收到更新信息，但ID:" + str(carId) + "信息未知，重新获取"
+        gInfo = "ID:" + str(carId) + " unknow,requiring"
         print("CarId:%s is not ready yet,try to get carInfo" % carId)
         s.getCarInfo(carId)
         s.processServerPackets(1)
@@ -221,7 +221,7 @@ def check_line(linedata):
         print("\nlinedata:%s" % linedata)
         data = linedata.split(" ")
         carId = int(data[1])
-        gInfo = "ID:" + str(carId) + "完成计时点"
+        gInfo = "ID:" + str(carId) + " sector finished"
         splitTimeCount = int(data[2])
         splitTime = int(data[3])/1000
         if carId in playersDict:
@@ -239,7 +239,7 @@ def check_line(linedata):
 
         else:
             print("CarId:%s is not ready yet,try to get carInfo" % carId)
-            gInfo = "ID:" + str(carId) + "信息未知，重新获取"
+            gInfo = "ID:" + str(carId) + " unknow,requiring"
             s.getCarInfo(carId)
             s.processServerPackets(1)
 
@@ -250,7 +250,7 @@ def getJson():
     for carId in playersDict:
         playersDictForJson[carId] = playersDict[carId].__dict__
     if not playersDictForJson:
-        gInfo = "当前无人在线" + time.strftime("%H:%M:%S", time.localtime())
+        gInfo = time.strftime("%H:%M:%S", time.localtime())
     data = {"mInfo": gInfo, "mVehicles": playersDictForJson}  # gInfo = global info
     try:
         jsonStr = json.dumps(data, ensure_ascii=False)
@@ -275,11 +275,11 @@ def get_ac_cfg(cfg):
 def get_carInfo():
     global s, gInfo
     for i in range(maxPlayer):
-        gInfo = "获取ID:%s的信息" % i
+        gInfo = "Getting ID:%s" % i
         print("\rGet car info %s,please wait..." % i, end="")
         s.getCarInfo(i)
         s.processServerPackets(1)
-    gInfo = "获取信息完毕，等待更新包"
+    gInfo = "waiting for update"
 
 
 def get_time_str():

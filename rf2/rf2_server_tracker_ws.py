@@ -133,39 +133,9 @@ def send_err_mail(msg):
 
 
 def get_rf2_ws_data():
-    '''global playersList
-    try:
-        t = requests.get("http://127.0.0.1:34297/getScoringInfo").text
-        t = t.replace("\t", "").replace("\n", "").replace("\\", "")
-        data = json.loads(t)
-        print(data)
-        vehDict = data['mVehicles']
-        newVeh = {}
-        for i in vehDict:
-            veh = vehDict[i]
-            mDriverName = veh['mDriverName'].replace(" ", "")
-            if mDriverName not in playersList:
-                t = get_player_dhq_info(mDriverName).split("|")
-                player = Player()
-                player.cname = t[0]
-                player.uid = t[2]
-                playersList[mDriverName] = player
-            veh = veh.update(playersList[mDriverName])
-            newVeh[i] = veh
-    except Exception:
-        traceback.print_exc()
-        sys.exit(0)
-
-    # data = {"mVehicles": newVeh}
-    # print(data)'''
     t = requests.get("http://127.0.0.1:34297/getScoringInfo").text
     data = t.replace("\t", "").replace("\n", "").replace("\\", "")
     re = json.dumps(data, ensure_ascii=False)
-    return re
-
-
-def get_player_dhq_info(driverName):
-    re = requests.get("https://www.srfcworld.com/app/get_cname/%s?mode=name" % driverName).text.strip()
     return re
 
 
@@ -235,6 +205,7 @@ def main():
             refresh(config)
         except Exception as e:
             errorHandle(e)
+
 
 playersList = {}
 
