@@ -19,7 +19,7 @@ def wss_broadcast(port, sslKey, sslCert, sslDebug,  func, inter=0.1):
     def sendData():
         while True:
             try:
-                to_send = func().replace('\'', '\"')
+                to_send = str(server.hasClients()) + "-!-" + func().replace('\'', '\"')
                 # print("to_send:%s" % to_send)
                 server.broadcast(to_send, False)
             except:

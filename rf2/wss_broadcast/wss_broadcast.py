@@ -17,7 +17,7 @@ def wss_broadcast(port, sslKey, sslCert, sslDebug,  func, inter=0.3):
     def sendData():
         while True:
             try:
-                to_send = func()
+                to_send = str(server.hasClients()) + "-!-" + func()
                 server.broadcast(to_send, False)
             except:
                 exc_type, exc_value, exc_traceback = sys.exc_info()

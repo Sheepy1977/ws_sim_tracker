@@ -174,8 +174,8 @@ class ResourceProtocol(WebSocketServerProtocol):
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()
 			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                          limit=6, file=sys.stdout)
+			traceback.print_exception(exc_type, exc_value, exc_traceback, limit=6, file=sys.stdout)
+
 
 	def onClose(self, wasClean, code, reason):
 		try:
@@ -184,8 +184,7 @@ class ResourceProtocol(WebSocketServerProtocol):
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()
 			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                          limit=2, file=sys.stdout)
+			traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
 
 
 def server_main(ServerClass = Server, **kwargs):

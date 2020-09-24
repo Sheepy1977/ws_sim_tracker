@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import logging
 import requests
 import sys
 import json
@@ -193,10 +192,6 @@ def handle_car_update(event):
             check_line(linedata)
             lastRead += 1
         logObj.close()
-        try:
-            iniObj.set("Last_read", str(lastRead))
-        except Exception:
-            traceback.print_exc()
 
 
 def get_lastest_file(path):
@@ -251,6 +246,7 @@ def getJson():
         playersDictForJson[carId] = playersDict[carId].__dict__
     if not playersDictForJson:
         gInfo = time.strftime("%H:%M:%S", time.localtime())
+
     data = {"mInfo": gInfo, "mVehicles": playersDictForJson}  # gInfo = global info
     try:
         jsonStr = json.dumps(data, ensure_ascii=False)
@@ -287,14 +283,12 @@ def get_time_str():
 
 
 def do_post(data, url):
-    do_log(data, "postlog.log")
     print("\n%s 发送数据：%s" % (get_time_str(), data))
     data = {"data": data}
     try:
         re = requests.post(url=url, data=data, headers=headers)
         print("%s 服务器返回：" % get_time_str())
         re_content = str(re.content.decode('utf-8'))
-        do_log(re_content, "postlog.log")
         print(re_content)
         return True
     except WindowsError:
@@ -303,13 +297,8 @@ def do_post(data, url):
         return False
 
 
-def do_log(log, file):
-    logging.basicConfig(filename=file, filemode="w", level=logging.INFO,
-                        format='%(asctime)s - %(pathname)s[line:%(lineno)d]: %(message)s)')
-    logging.info(log)
-
-
 def gen_onlineList():
+    global online_log
     print("gen online list")
     playerCount = 0
     guidList = ""
@@ -318,9 +307,11 @@ def gen_onlineList():
         if player.isConnected is True:
             playerCount += 1
             guidList = "%s|%s" % (guidList, player.guid)
-    online_log = "%d,%s" % (playerCount, guidList)
-    post_url = "https://www.srfcworld.com/misc/server_status?sn=%s&DEBUG=1" % ini['sid']
-    do_post(online_log, post_url)
+    new_online_log = "%d,%s" % (playerCount, guidList)
+    if new_online_log != online_log:
+        post_url = "https://www.srfcworld.com/misc/server_status?sn=%s&DEBUG=1" % ini['sid']
+        do_post(online_log, post_url)
+        online_log = new_online_log
 
 
 def main_udp_watcher(s):
@@ -355,13 +346,14 @@ if __name__ == "__main__":
     gInfo = "实时服务器已经开启,版本0.80"  # 全局信息传输，传输get car info等信息
     iniObj = IniHandle()
     ini = iniObj.read()
-
+    udp_watchers = 0  # 记录观看者数量
     ACPath = ini['AC_path']
     logPath = ACPath + "logs/session/"
     ac_cfg = get_ac_cfg(ACPath + "cfg/server_cfg.ini")
     print("Server:" + ac_cfg['NAME'] + "\n")
     maxPlayer = int(ac_cfg['MAX_CLIENTS'])
     print("Max player:" + str(maxPlayer))
+    online_log = ""
 
     rcvPort = int(ini['UDP_PLUGIN_ADDRESS'])
     sendPort = int(ini['UDP_PLUGIN_LOCAL_PORT'])
