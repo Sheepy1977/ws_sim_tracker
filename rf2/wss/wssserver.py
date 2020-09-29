@@ -74,11 +74,12 @@ class Server(DebugPrinter):
 					else:
 						c.sendTextMsg(msg)
 		except:
-			self.print_debug("exception while broadcast()")
-			exc_type, exc_value, exc_traceback = sys.exc_info()
-			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                          limit=6, file=sys.stdout)
+                        pass
+			#self.print_debug("exception while broadcast()")
+			# exc_type, exc_value, exc_traceback = sys.exc_info()
+			# traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+			# traceback.print_exception(exc_type, exc_value, exc_traceback,
+                        #  limit=6, file=sys.stdout)
 
 
 	def unregisterClient(self, client):
@@ -105,7 +106,7 @@ class Server(DebugPrinter):
 		pass
 
 	def start(self):
-		self.print_debug("\nstart() called... debug = {}".format(self.debug))
+		self.print_debug("start() called... debug = {}".format(self.debug))
 		ws = "ws"
 
 		sslcontext = None
@@ -131,7 +132,7 @@ class Server(DebugPrinter):
 		coro = loop.create_server(factory, '', self.port, ssl=sslcontext)
 		self.server = loop.run_until_complete(coro)
 
-		self.print_debug("\nserver should be started now")
+		self.print_debug("server should be started now")
 
 	def startTwisted(self):
 		from twisted.python import log
@@ -179,7 +180,7 @@ class ResourceProtocol(WebSocketServerProtocol):
 
 	def onClose(self, wasClean, code, reason):
 		try:
-			ResourceProtocol.server.print_debug("WebSocket connection closed: {0}".format(reason))
+			ResourceProtocol.server.print_debug("\nWebSocket connection closed: {0}".format(reason))
 			ResourceProtocol.server.unregisterClient(self)
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()

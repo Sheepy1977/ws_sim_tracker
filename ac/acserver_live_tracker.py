@@ -305,20 +305,32 @@ def gen_onlineList():
     for carId in playersDict:
         player = playersDict[carId]
         if player.isConnected is True:
-            playerCount += 1
+            playerCount = playerCount + 1
             guidList = "%s|%s" % (guidList, player.guid)
-    new_online_log = "%d,%s" % (playerCount, guidList)
+    new_online_log = "%s,%s" % (playerCount, guidList)
     if new_online_log != online_log:
         post_url = "https://www.srfcworld.com/misc/server_status?sn=%s&DEBUG=1" % ini['sid']
-        do_post(online_log, post_url)
+        do_post(new_online_log, post_url)
         online_log = new_online_log
+    return playerCount
 
 
 def main_udp_watcher(s):
     get_carInfo()
-    gen_onlineList()
     while True:
+        # check_restart()
         s.processServerPackets()
+
+
+def check_restart():
+    start_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '0:30', '%Y-%m-%d%H:%M')
+    end_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '6:30', '%Y-%m-%d%H:%M')
+    now_time = datetime.datetime.now()
+    if gen_onlineList == 0 and start_time < now_time < end_time:
+        os.system('%s%s' % ("taskkill /F /IM ", "acServer.exe"))
+        os.system(ini['AC_path'] + '/acServer.bat')
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
 
 
 def main():
@@ -341,9 +353,9 @@ def main():
 
 
 if __name__ == "__main__":
-    print("SRFC AC SERVER UDP TRACKER 0.80\n\n")
+    print("SRFC AC SERVER UDP TRACKER 0.811\n\n")
     s = ""  # ac server obj
-    gInfo = "实时服务器已经开启,版本0.80"  # 全局信息传输，传输get car info等信息
+    gInfo = "实时服务器已经开启,版本0.81"  # 全局信息传输，传输get car info等信息
     iniObj = IniHandle()
     ini = iniObj.read()
     udp_watchers = 0  # 记录观看者数量

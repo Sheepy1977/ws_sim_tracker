@@ -61,7 +61,7 @@ class GetData:
                     lastlap = row2['mLastLapTime']
                     lapStartET = row2['mLapStartET']
                     lapET = currentET - lapStartET
-                    if 1 > lapET > 0 and lastlap > 0:
+                    if lastlap > 0:
                         coord = {'playerName': playerName, 'carName': carName, 'laps': laps, 'last1': last1, 'last2': last2,
                                  'lastlap': lastlap, 'session': session, 'airTemp': airTemp, 'trackTemp': trackTemp,
                                  'trackWet': trackWet,
@@ -142,7 +142,7 @@ def send_err_mail(msg):
 def get_rf2_ws_data():
     t = requests.get("http://127.0.0.1:34297/getScoringInfo").text
     data = t.replace("\t", "").replace("\n", "").replace("\\", "")
-    store_lap_data(t)
+    # store_lap_data(t)
     return data
 
 
@@ -250,7 +250,7 @@ def refresh():
         msg += "."
         if msg == "....":
             msg = "."
-        time.sleep(2)
+        time.sleep(1)
 
 
 def main():
