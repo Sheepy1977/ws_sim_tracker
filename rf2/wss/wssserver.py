@@ -74,13 +74,12 @@ class Server(DebugPrinter):
 					else:
 						c.sendTextMsg(msg)
 		except:
-                        pass
-			#self.print_debug("exception while broadcast()")
+			pass
+			# self.print_debug("exception while broadcast()")
 			# exc_type, exc_value, exc_traceback = sys.exc_info()
 			# traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
 			# traceback.print_exception(exc_type, exc_value, exc_traceback,
-                        #  limit=6, file=sys.stdout)
-
+            # limit=6, file=sys.stdout)
 
 	def unregisterClient(self, client):
 		if isinstance(client, Client):

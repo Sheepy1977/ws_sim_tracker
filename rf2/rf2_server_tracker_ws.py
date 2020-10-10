@@ -1,5 +1,5 @@
 """SRFC RF2 SERVER TRACKER by Sheepy 2020"""
-
+import os
 import sys
 import requests
 import json
@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from wss_broadcast import wss_broadcast
 import threading
+from urllib3 import encode_multipart_formdata
 
 headers = {'user-agent': 'SRFC rF2 TRACK/0.6'}
 
@@ -39,6 +40,7 @@ class GetData:
         self.jsonData = json.loads(self.r.text)
 
     def decode(self):
+
         row = self.jsonData
         if "mTrackName" in row.keys():
             track = row['mTrackName']
@@ -50,6 +52,15 @@ class GetData:
             currentET = row['mCurrentET']
             post_data = ""
             onlineList = ""
+
+            if session == 1 and currentET < 5 and config['daily'] == "1":  # 0 => "未定义",1 => "练习", 5 => "排位",6 => "暖胎",7 => "比赛",
+                if currentET <= 1:
+                    print("\n%s 进入练习节，检查是否有最新比赛成绩" % getTimeStr())
+                result = get_lastest_file()
+                if result:
+                    print(result)
+                    post_result(result)
+
             if guests > 0:
                 for row2 in row['mVehicles']:
                     playerName = row2['mDriverName']
@@ -60,19 +71,60 @@ class GetData:
                     last2 = row2['mLastSector2']
                     lastlap = row2['mLastLapTime']
                     lapStartET = row2['mLapStartET']
-                    lapET = currentET - lapStartET
                     if lastlap > 0:
-                        coord = {'playerName': playerName, 'carName': carName, 'laps': laps, 'last1': last1, 'last2': last2,
+                        coord = {'playerName': playerName, 'carName': carName, 'laps': laps, 'last1': last1,
+                                 'last2': last2,
                                  'lastlap': lastlap, 'session': session, 'airTemp': airTemp, 'trackTemp': trackTemp,
                                  'trackWet': trackWet,
                                  'pit': 0}
-                        data = """rf2,1,{playerName},{carName},4,5,6,7,{pit},{laps},{last1},{last2},{lastlap},{last1},{last2},{lastlap},16,{session},{airTemp},{trackTemp},{trackWet}\n""".format(**coord)
+                        data = """rf2,1,{playerName},{carName},4,5,6,7,{pit},{laps},{last1},{last2},{lastlap},{last1},{last2},{lastlap},16,{session},{airTemp},{trackTemp},{trackWet}\n""".format(
+                            **coord)
                         post_data = "%s%s" % (post_data, data)
                     onlineList = "%s|%s" % (onlineList, playerName)
             onlineList = "%d,%s" % (guests, onlineList)
             return [post_data, onlineList, track]
         else:
             return None
+
+
+def post_result(resultFile):
+    global latestResultFile
+    url = "https://www.srfcworld.com/admin/result/daily_upload?sn=" + config['sid'] + "&DEBUG=1"
+    if resultFile != latestResultFile:
+        try:
+            data = {'file': ('test.xml', open(resultFile, 'rb').read())}
+            encode_data = encode_multipart_formdata(data)
+            data = encode_data[0]
+            header = {'Content-Type': encode_data[1]}
+            r = requests.post(url, headers=header, data=data)
+            print(r.content.decode('utf-8'))
+            latestResultFile = resultFile
+        except Exception:
+            traceback.print_exc()
+            sys.exit(0)
+    else:
+        print("成绩文件已经上传。")
+
+
+def get_lastest_file():
+    global latestResultFile
+    path = config['rf2_log_path']
+    dirs = os.listdir(path)
+    fileDict = {}
+    for filename in dirs:
+        if "R1.xml" in filename:
+            fullPath = os.path.join(path, filename)
+            mtime = int(os.stat(fullPath).st_mtime)
+            fileDict[mtime] = fullPath
+    key = sorted(fileDict.keys())[-1]
+    if fileDict[key] == latestResultFile:
+        return False
+    if int(time.time()) - key > 30:
+        print("\n文件 %s 太老，并非最新比赛结果,不予上传。" % str(fileDict[key]))
+        latestResultFile = fileDict[key]
+        return False
+    else:
+        return fileDict[key]
 
 
 def doPost(data, url):
@@ -165,7 +217,8 @@ def store_lap_data(data):
                     velX = row2['mLocalVel_X']
                     velY = row2['mLocalVel_Z']
                     vel = (velX * velX + velY * velY) ** 0.5 * 3.6
-                    data = str(round(row2['mPos_X'], 2)) + "," + str(round(row2['mPos_Y'], 2)) + "," + str(round(vel, 2)) + "," + str(round(time.time(), 2))
+                    data = str(round(row2['mPos_X'], 2)) + "," + str(round(row2['mPos_Y'], 2)) + "," + str(
+                        round(vel, 2)) + "," + str(round(time.time(), 2))
 
                     if driverName in playersList:
                         player = playersList[driverName]
@@ -254,7 +307,7 @@ def refresh():
 
 
 def main():
-    print("SRFC rF2 Server TRACKER v0.0.60 by Sheepy\n")
+    print("SRFC rF2 Server TRACKER v0.0.80 by Sheepy\n")
     sys.stderr = open("err.log", "w")
     check = wss_broadcast.checkConfig(config)
     if check is not False:
@@ -262,7 +315,8 @@ def main():
         wss_inter = check[2]
         print("Wss interval set to " + str(wss_inter) + "sec")
         t1 = threading.Thread(target=wss_broadcast.wss_broadcast,
-                              args=(config['wss_port'], config['sslKey'], config['sslCert'], sslDebug, get_rf2_ws_data, wss_inter))
+                              args=(config['wss_port'], config['sslKey'], config['sslCert'], sslDebug, get_rf2_ws_data,
+                                    wss_inter))
         # 第5个参数是具体获得数据的函数名，比如get_ac_ws_data
         t2 = threading.Thread(target=refresh)
         try:
@@ -283,6 +337,7 @@ playersList = {}
 
 if __name__ == "__main__":
     config = IniHandle().read()
+    latestResultFile = ""
     try:
         main()
     except Exception as e:
