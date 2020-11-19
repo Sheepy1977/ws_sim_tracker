@@ -8,10 +8,12 @@ import threading
 from acplugins4python.ac_server_protocol import *
 from acplugins4python.ac_server_plugin import *
 from lib.mylib import *
+from urllib3 import encode_multipart_formdata
+
 
 playersDict = {}
 NOTIME = 0
-headers = {'user-agent': 'SRFC AC TRACKER/0.8'}
+headers = {'user-agent': 'SRFC AC TRACKER/0.9'}
 
 
 class Player:
@@ -45,9 +47,14 @@ class Player:
 def callback(event):
     global sessionInfo, gInfo
     if type(event) in [NewSession, SessionInfo]:
+        if sessionInfo != '':
+            if event.sessionIndex != sessionInfo.sessionIndex:  # 如果新的sessionIndex和旧的不一样，代表进入了新session，重新读一下车辆信息
+                handle_new_session()
+        else:
+            handle_new_session()
         sessionInfo = event
-        print("NewSession:")
-        handle_new_session()
+        # print(sessionInfo)  # elapsedMS  sessionType = 1 for practice  sessionTime = 120 (min)
+        # handle_new_session()
         # s.enableRealtimeReport(1000)
         # access the event data with
         # event.name, event.laps, etc. see the ac_server_protocol.py for the event definitions
@@ -57,18 +64,18 @@ def callback(event):
     elif type(event) == CarUpdate:
         handle_car_update(event)
     elif type(event) == NewConnection:
-        print("NewConnection")
+        print("\n新连接")
         handle_NewConnection(event)
     elif type(event) == ConnectionClosed:
-        print("ConnectionClosed")
+        print("\n连接关闭")
         handle_ConnectionClosed(event)
     elif type(event) == LapCompleted:
-        print("LapCompleted")
+        print("\n完成了一圈")
         handle_lap_completed(event)
     elif type(event) == EndSession:
-        print("EndSession")
+        print("\nEndSession")
     elif type(event) == ClientLoaded:
-        print("ClientLoaded")
+        print("\n客户加载完毕")
         gInfo = str(event.carId) + " loaded"
     elif type(event) == ProtocolError:
         print("ProtocolError")
@@ -79,16 +86,35 @@ def callback(event):
 
 
 def handle_new_session():
-    global gInfo
+    global gInfo, latestResultFile
     gInfo = "New SESSION"
+    if ini['daily'] == 1:
+        resultFile = get_lastest_result_file(resultPath)
+        url = "https://www.srfcworld.com/admin/result/daily_upload?sn=" + ini['sid'] + "&DEBUG=1"
+        if resultFile != latestResultFile:
+            try:
+                data = {'file': ('acResult.json', open(resultFile, 'rb').read())}
+                encode_data = encode_multipart_formdata(data)
+                data = encode_data[0]
+                header = {'Content-Type': encode_data[1]}
+                r = requests.post(url, headers=header, data=data)
+                print(r.content.decode('utf-8'))
+                latestResultFile = resultFile
+            except Exception:
+                traceback.print_exc()
+                sys.exit(0)
+        else:
+            print("\n成绩文件已经上传。")
+
     get_carInfo()  # 新session确保carId列表正确
+    gen_onlineList()
 
 
 def handle_NewConnection(event):
     global gInfo, playersDict
     # print_event(event)
     carId = int(event.carId)
-    gInfo = "New connection，ID:" + str(carId)
+    gInfo = "\n新连接，ID:" + str(carId)
     if carId not in playersDict:
         player = Player(carId)
     else:
@@ -114,8 +140,9 @@ def handle_car_info(event):
 
 def handle_ConnectionClosed(event):
     global gInfo, playersDict
+    getSessionInfo()
     carId = int(event.carId)
-    gInfo = "ID:" + str(carId) + " disconnected"
+    gInfo = "ID:" + str(carId) + " 断开连接"
     if carId in playersDict:
         # playersDict[carId].isConnected = False
         del playersDict[carId]
@@ -125,7 +152,7 @@ def handle_ConnectionClosed(event):
 def handle_lap_completed(event):
     global s, gInfo, playersDict
     carId = int(event.carId)
-    gInfo = "ID:" + str(carId) + " finished a lap"
+    gInfo = "ID:" + str(carId) + " 完成了1圈"
     if carId in playersDict:
         player = playersDict[carId]
         player.mLastLapTime = event.lapTime / 1000
@@ -210,6 +237,22 @@ def get_lastest_file(path):
         return fileDict[key]
 
 
+def get_lastest_result_file(path):
+    dirs = os.listdir(path)
+    fileDict = {}
+    for filename in dirs:
+        if "RACE" in filename:
+            fullPath = os.path.join(path, filename)
+            mtime = int(os.stat(fullPath).st_mtime)
+            fileDict[mtime] = fullPath
+    key = sorted(fileDict.keys())[-1]
+    if int(time.time()) - key > 10:
+        print("成绩文件 %s 太老，不予上传" % str(fileDict[key]))
+        return False
+    else:
+        return fileDict[key]
+
+
 def check_line(linedata):
     global playersDict, lastRead, gInfo, s
     if linedata.find("Car.onSplitCompleted") > -1:
@@ -240,14 +283,18 @@ def check_line(linedata):
 
 
 def getJson():
-    global gInfo
+    global gInfo, sessionInfo
+    print("\r%s 等待数据。。。。。。" % get_time_str(), end="")
     playersDictForJson = {}
+    current_time = int(time.time())
+    if current_time % 15 == 0:
+        getSessionInfo()
     for carId in playersDict:
         playersDictForJson[carId] = playersDict[carId].__dict__
     if not playersDictForJson:
         gInfo = time.strftime("%H:%M:%S", time.localtime())
 
-    data = {"mInfo": gInfo, "mVehicles": playersDictForJson}  # gInfo = global info
+    data = {"mInfo": gInfo, "mVehicles": playersDictForJson, "sessionInfo": sessionInfo.__dict__}  # gInfo = global info
     try:
         jsonStr = json.dumps(data, ensure_ascii=False)
         return jsonStr
@@ -272,10 +319,10 @@ def get_carInfo():
     global s, gInfo
     for i in range(maxPlayer):
         gInfo = "Getting ID:%s" % i
-        print("\rGet car info %s,please wait..." % i, end="")
+        print("\r获取 car info %s,稍等..." % i, end="")
         s.getCarInfo(i)
         s.processServerPackets(1)
-    gInfo = "waiting for update"
+    gInfo = "等待车辆信息"
 
 
 def get_time_str():
@@ -299,7 +346,7 @@ def do_post(data, url):
 
 def gen_onlineList():
     global online_log
-    print("gen online list")
+    print("生成在线名单")
     playerCount = 0
     guidList = ""
     for carId in playersDict:
@@ -315,22 +362,16 @@ def gen_onlineList():
     return playerCount
 
 
+def getSessionInfo():
+    global s
+    s.getSessionInfo()  # elapsedMS  sessionType = 1 for practice  sessionTime = 120 (min)
+    s.processServerPackets(1)
+    print("\r%s 获取Session信息" % get_time_str(), end="")
+
+
 def main_udp_watcher(s):
-    get_carInfo()
     while True:
-        # check_restart()
         s.processServerPackets()
-
-
-def check_restart():
-    start_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '0:30', '%Y-%m-%d%H:%M')
-    end_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '6:30', '%Y-%m-%d%H:%M')
-    now_time = datetime.datetime.now()
-    if gen_onlineList == 0 and start_time < now_time < end_time:
-        os.system('%s%s' % ("taskkill /F /IM ", "acServer.exe"))
-        os.system(ini['AC_path'] + '/acServer.bat')
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
 
 
 def main():
@@ -338,7 +379,9 @@ def main():
     s = ACServerPlugin(rcvPort, sendPort, callback)
     s.enableRealtimeReport(100)
     s.processServerPackets(0)
-
+    getSessionInfo()
+    # gen_onlineList()
+    
     t1 = threading.Thread(target=broadcast.wss_broadcast,
                           args=(ini['wss_port'], ini['sslKey'], ini['sslCert'],
                                 ini['sslDebug'], getJson, ini['wss_inter']))
@@ -353,32 +396,36 @@ def main():
 
 
 if __name__ == "__main__":
-    print("SRFC AC SERVER UDP TRACKER 0.811\n\n")
+    print("SRFC AC SERVER UDP TRACKER 0.9\n\n")
     s = ""  # ac server obj
-    gInfo = "实时服务器已经开启,版本0.81"  # 全局信息传输，传输get car info等信息
+    gInfo = "实时服务器已经开启,版本0.9"  # 全局信息传输，传输get car info等信息
     iniObj = IniHandle()
     ini = iniObj.read()
     udp_watchers = 0  # 记录观看者数量
     ACPath = ini['AC_path']
     logPath = ACPath + "logs/session/"
+    resultPath = ACPath + "results/"
     ac_cfg = get_ac_cfg(ACPath + "cfg/server_cfg.ini")
-    print("Server:" + ac_cfg['NAME'] + "\n")
+    print("Server:" + ac_cfg['NAME'])
     maxPlayer = int(ac_cfg['MAX_CLIENTS'])
     print("Max player:" + str(maxPlayer))
     online_log = ""
-
+    latestResultFile = ''
+    sessionInfo = ''
     rcvPort = int(ini['UDP_PLUGIN_ADDRESS'])
     sendPort = int(ini['UDP_PLUGIN_LOCAL_PORT'])
     if ini['Output_split_time'] == "1":
+        print("计时段记录功能开启")
         logFile = get_lastest_file(logPath)
         logObj = ServerLogHandle(logFile)
         lastlogLineCount = logObj.countLines() - 1
         lastRead = lastlogLineCount  # 若重启，直接从最后行开始
         print(logFile)
-        print("Log line:" + str(lastlogLineCount))
-        print("Last Read:" + str(lastRead))
-    else:
-        print("Split time output not available.")
+        print("Log 行数:" + str(lastlogLineCount))
+        print("上次读到:" + str(lastRead))
+
+    if ini['daily'] == "1":
+        print("日赛记录功能开启")
 
     try:
         main()

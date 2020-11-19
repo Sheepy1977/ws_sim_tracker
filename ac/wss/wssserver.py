@@ -2,11 +2,12 @@ from autobahn.asyncio.websocket import WebSocketServerProtocol, WebSocketServerF
 import ssl
 
 import asyncio
-import sys, traceback
-from binascii import hexlify
-import json
+import sys
+import traceback
+
 
 from .wssclient import DebugPrinter
+
 
 class Client:
 	def __init__(self, handle):
@@ -33,6 +34,7 @@ class Client:
 
 	def setCloseHandler(self, callback):
 		self.closeHandler = callback
+
 
 class Server(DebugPrinter):
 
@@ -74,12 +76,13 @@ class Server(DebugPrinter):
 					else:
 						c.sendTextMsg(msg)
 		except:
-			self.print_debug("exception while broadcast()")
-			exc_type, exc_value, exc_traceback = sys.exc_info()
-			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                          limit=6, file=sys.stdout)
+			pass
 
+			# self.print_debug("exception while broadcast()")
+			# exc_type, exc_value, exc_traceback = sys.exc_info()
+			# traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+			# traceback.print_exception(exc_type, exc_value, exc_traceback,
+			# limit=6, file=sys.stdout)
 
 	def unregisterClient(self, client):
 		if isinstance(client, Client):

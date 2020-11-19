@@ -363,8 +363,11 @@ def main():
         if readLineNo > logLineCount:
             print("检测到ACC服重启，监控数据库重置")
             print()
+            print("\n>0人在线")
+            sid = config['sid']
+            post_url = "https://www.srfcworld.com/misc/server_status?sn=%s&DEBUG=1" % sid
+            doPost("0,", post_url)
             db.dbInit()  # 清理数据库
-            DataHandle("", config, db, carDict).genOnlineList()  # 清空在线名单
 
         elif readLineNo < logLineCount:
             print("\r%s %d/%d 已读取，扫描server.log中 %s   " % (getTimeStr(), readLineNo, logLineCount, msg), end="")
